@@ -120,8 +120,8 @@ SIGMA = 3.41e-10 # м
 MASS = 6.63e-26 # кг
 
 def main():
-    sys = ParticleSystem(100, EPSILON, SIGMA, MASS, 1e-10)
-    dt = 1e-20
+    sys = ParticleSystem(100, EPSILON, SIGMA, MASS, 1e-6)
+    dt = 1e-14
     for i in range(100):
         sys.update(dt)
         print(f'Ek: {sys.calc_Ek()}, Ep: {sys.calc_Ep()}, E: {sys.calc_E()}')
