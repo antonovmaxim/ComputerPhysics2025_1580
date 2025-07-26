@@ -14,10 +14,19 @@ class Particle():
         ep = self.ep
         sigma = self.sigma
         F = np.array([0.0, 0.0])
+        L = self.pclsys.L  # Размер квадрата
 
         for p in self.pclsys.particles:
-            # r - расстояние между p и self
+            if p is self:
+                continue
+
+            # Рассчитываем расстояние с учетом периодических граничных условий
             r = self.cord - p.cord
+            
+            # Применяем периодические граничные условия для расчета кратчайшего расстояния
+            r[0] = r[0] - L * round(r[0] / L)
+            r[1] = r[1] - L * round(r[1] / L)
+            
             r_abs = np.sqrt(np.sum(r**2))
             if r_abs == 0.0:
                 continue
@@ -30,12 +39,21 @@ class Particle():
         acc = self.calc_acceleration()
         # Используем метод Верле:
         self.cord = self.cord + self.vel * dt + 1/2 * acc * dt**2
+        
+        # Применяем периодические граничные условия
+        L = self.pclsys.L
+        self.cord[0] = self.cord[0] % L
+        self.cord[1] = self.cord[1] % L
+        
         self.vel = self.vel + 1/2 * (acc + self.calc_acceleration()) * dt
 
 class ParticleSystem():
-    def __init__(self, N, ep, sigma, m):
+    def __init__(self, N, ep, sigma, m, L):
+        # L - длина стороны квадрата, в котором расположены частицы
+        self.L = L
         self.particles = [Particle(self, ep, sigma, m) for _ in range(N)]
         self.time = 0.0
+
     def update(self, dt):
         for particle in self.particles:
             particle.update(dt)
