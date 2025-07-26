@@ -1,8 +1,8 @@
 import numpy as np
 
 class Particle():
-    def __init__(self, pclsys, ep, sigma, m):
-        self.cord = np.array([0.0, 0.0]) # в СИ, м
+    def __init__(self, pclsys, ep, sigma, m, cord):
+        self.cord = cord # в СИ, м
         self.vel = np.array([0.0, 0.0]) # в СИ, м/с
         self.pclsys = pclsys
         self.sigma = sigma
@@ -51,10 +51,35 @@ class ParticleSystem():
     def __init__(self, N, ep, sigma, m, L):
         # L - длина стороны квадрата, в котором расположены частицы
         self.L = L
-        self.particles = [Particle(self, ep, sigma, m) for _ in range(N)]
+        n_side = int(np.sqrt(N))  # Число частиц вдоль стороны квадрата
+        a = L / n_side  # Расстояние между частицами
+
+        self.particles = []
+        # Размещаем частицы в регулярной решетке
+        for i in range(n_side):
+            for j in range(n_side):
+                x = (i + 0.5) * a
+                y = (j + 0.5) * a
+                self.particles.append(Particle(self, ep, sigma, m, np.array([x, y])))
+        
+        # Если число частиц не является ровным квадратом - оставшиеся докинем случайно
+        remaining = N - n_side * n_side
+        for _ in range(remaining):
+            x = np.random.uniform(0, L)
+            y = np.random.uniform(0, L)
+            self.particles.append(Particle(self, ep, sigma, m, np.array([x, y])))
+            
         self.time = 0.0
+        
 
     def update(self, dt):
         for particle in self.particles:
             particle.update(dt)
         self.time += dt
+
+# Пусть наш газ - Аргон
+EPSILON = 1.66e-21 # Дж
+SIGMA = 3.41e-10 # м
+
+def main():
+    pass
