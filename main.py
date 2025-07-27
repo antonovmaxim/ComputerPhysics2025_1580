@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 EPSILON = 1.0
 SIGMA = 1.0
 MASS = 1.0
-T0 = 300 #?
+T0 = 1 #?
 # Постоянная Больцмана
 K_b = 1
 
@@ -105,9 +105,9 @@ class ParticleSystem:
 
         # 5. Термализация
         # Простая термализация с масштабированием скоростей
-        # if self.time < 10.0:  # термализация только в начале
-        #     for p in self.particles:
-        #         p.vel *= np.sqrt(2*K_b*T0/(MASS*p.vel.dot(p.vel)))
+        if self.time < 0.005*20:  # термализация только в начале
+            for p in self.particles:
+                p.vel *= np.sqrt(2*K_b*T0/(MASS*p.vel.dot(p.vel)))
 
         self.time += dt
 
@@ -138,7 +138,7 @@ def main():
         ek_list.append(ek)
         ep_list.append(ep)
         e_list.append(ek + ep)
-        print(f"Шаг {step:3d} | Ek = {ek:.4f}, Ep = {ep:.4f}, E = {ek+ep:.4f}")
+        print(f"Шаг {step:3d} | Ek = {ek:.4f}, Ep = {ep:.4f}, E = {ek+ep:.4f}\r", end="")
 
     # --- Построение графика ---
     fig = go.Figure()
@@ -149,7 +149,8 @@ def main():
     fig.update_layout(title='Энергия системы (безразмерные единицы)',
                       xaxis_title='Шаг по времени',
                       yaxis_title='Энергия (в ε)',
-                      legend=dict(x=0, y=1))
+                      legend=dict(x=0, y=1),
+                      template='plotly_dark')
     fig.show()
 
 if __name__ == '__main__':
