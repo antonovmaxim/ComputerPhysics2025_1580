@@ -5,6 +5,9 @@ import plotly.graph_objects as go
 EPSILON = 1.0
 SIGMA = 1.0
 MASS = 1.0
+T0 = 300 #?
+# Постоянная Больцмана
+K_b = 1
 
 class Particle:
     def __init__(self, pclsys, cord):
@@ -99,6 +102,12 @@ class ParticleSystem:
         # 4. Обновляем скорости
         for i, p in enumerate(self.particles):
             p.vel += 0.5 * (acc_old[i] + acc_new[i]) * dt
+
+        # 5. Термализация
+        # Простая термализация с масштабированием скоростей
+        # if self.time < 10.0:  # термализация только в начале
+        #     for p in self.particles:
+        #         p.vel *= np.sqrt(2*K_b*T0/(MASS*p.vel.dot(p.vel)))
 
         self.time += dt
 
