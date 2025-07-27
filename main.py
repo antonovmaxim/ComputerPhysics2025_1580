@@ -52,7 +52,7 @@ class Particle():
     
     def calc_Ep(self):
         def V(r):
-            return abs(4*self.eps*((self.sigma/r)**12 - (self.sigma/r)**6))
+            return (4*self.eps*((self.sigma/r)**12 - (self.sigma/r)**6))
         
         ep = 0.0
         L = self.pclsys.L
