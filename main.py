@@ -52,7 +52,7 @@ class Particle():
     
     def calc_Ep(self):
         def V(r):
-            return 4*self.eps*((self.sigma/r)**12 - (self.sigma/r)**6)
+            return abs(4*self.eps*((self.sigma/r)**12 - (self.sigma/r)**6))
         
         ep = 0.0
         L = self.pclsys.L
@@ -123,12 +123,13 @@ import plotly.graph_objects as go
 
 def main():
     sys = ParticleSystem(100, EPSILON, SIGMA, MASS, 1e-8)
-    dt = 1e-14
+    dt = 1e-15
     ek_values = []
     ep_values = []
     e_values = []
 
-    for i in range(40):
+    for i in range(100):
+        print(f"{i}\r", end='')
         sys.update(dt)
         k = sys.calc_Ek()
         p = sys.calc_Ep()
