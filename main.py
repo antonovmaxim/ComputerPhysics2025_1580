@@ -1,153 +1,147 @@
 import numpy as np
+import plotly.graph_objects as go
 
-class Particle():
-    def __init__(self, pclsys, eps, sigma, m, cord):
-        self.cord = cord # в СИ, м
-        self.vel = np.array([0.0, 0.0]) # в СИ, м/с
+# === Безразмерные параметры ===
+EPSILON = 1.0
+SIGMA = 1.0
+MASS = 1.0
+
+class Particle:
+    def __init__(self, pclsys, cord):
         self.pclsys = pclsys
-        self.sigma = sigma
-        self.eps = eps
-        self.m = m
+        self.cord = cord.copy()
+        self.vel = np.array([0.0, 0.0])  # будет задана позже
 
     def calc_acceleration(self):
-        # params: pclsys, vel, cord
-        ep = self.eps
-        sigma = self.sigma
         F = np.array([0.0, 0.0])
-        L = self.pclsys.L  # Размер квадрата
+        L = self.pclsys.L
+        sigma = SIGMA
+        eps = EPSILON
 
         for p in self.pclsys.particles:
             if p is self:
                 continue
 
-            # Рассчитываем расстояние с учетом периодических граничных условий
             r = self.cord - p.cord
-            
-            # Применяем периодические граничные условия для расчета кратчайшего расстояния
-            r[0] = r[0] - L * round(r[0] / L)
-            r[1] = r[1] - L * round(r[1] / L)
-            
-            r_abs = np.sqrt(np.sum(r**2))
+            r -= L * np.round(r / L)  # периодические граничные условия
+            r_abs = np.linalg.norm(r)
             if r_abs == 0.0:
                 continue
 
-            F += - (24 * ep / sigma**2) * ((2 * (sigma / r_abs)**14) - (sigma / r_abs)**8) * r
+            f_scalar = (24 * eps / r_abs**2) * ((2 * (sigma / r_abs)**12) - (sigma / r_abs)**6)
+            F += f_scalar * r
 
-        return F / self.m
-    
-    def update(self, dt):
-        acc = self.calc_acceleration()
-        # Используем метод Верле:
-        self.cord = self.cord + self.vel * dt + 1/2 * acc * dt**2
-        
-        # Применяем периодические граничные условия
-        L = self.pclsys.L
-        self.cord[0] = self.cord[0] % L
-        self.cord[1] = self.cord[1] % L
-        
-        self.vel = self.vel + 1/2 * (acc + self.calc_acceleration()) * dt
-    
+        return F / MASS
+
     def calc_Ek(self):
-        return 0.5 * self.m * np.sum(self.vel**2)
-    
+        return 0.5 * MASS * np.dot(self.vel, self.vel)
+
     def calc_Ep(self):
         def V(r):
-            return (4*self.eps*((self.sigma/r)**12 - (self.sigma/r)**6))
-        
+            return 4 * EPSILON * ((SIGMA / r)**12 - (SIGMA / r)**6)
+
         ep = 0.0
         L = self.pclsys.L
-        
+
         for p in self.pclsys.particles:
             if p is self:
                 continue
-                
-            # Рассчитываем расстояние с учетом периодических граничных условий
             r = self.cord - p.cord
-            
-            # Применяем периодические граничные условия для расчета кратчайшего расстояния
-            r[0] = r[0] - L * round(r[0] / L)
-            r[1] = r[1] - L * round(r[1] / L)
-            
-            r_abs = np.sqrt(np.sum(r**2))
+            r -= L * np.round(r / L)
+            r_abs = np.linalg.norm(r)
             if r_abs == 0.0:
                 continue
             ep += V(r_abs)
+
         return ep
-    
 
-class ParticleSystem():
-    def __init__(self, N, ep, sigma, m, L):
-        # L - длина стороны квадрата, в котором расположены частицы
+class ParticleSystem:
+    def __init__(self, N, L):
+        self.N = N
         self.L = L
-        n_side = int(np.sqrt(N))  # Число частиц вдоль стороны квадрата
-        a = L / n_side  # Расстояние между частицами
-
         self.particles = []
-        # Размещаем частицы в регулярной решетке
+
+        # --- Располагаем частицы в узлах решетки ---
+        n_side = int(np.sqrt(N))
+        a = L / n_side
+
         for i in range(n_side):
             for j in range(n_side):
+                if len(self.particles) >= N:
+                    break
                 x = (i + 0.5) * a
                 y = (j + 0.5) * a
-                self.particles.append(Particle(self, ep, sigma, m, np.array([x, y])))
-        
-        # Если число частиц не является ровным квадратом - оставшиеся докинем случайно
-        remaining = N - n_side * n_side
-        for _ in range(remaining):
-            x = np.random.uniform(0, L)
-            y = np.random.uniform(0, L)
-            self.particles.append(Particle(self, ep, sigma, m, np.array([x, y])))
-            
+                self.particles.append(Particle(self, np.array([x, y])))
+
+        # --- Случайные начальные скорости ---
+        for p in self.particles:
+            p.vel = np.random.randn(2)  # нормальное распределение
+
+        # --- Удаляем скорость центра масс ---
+        v_cm = sum(p.vel for p in self.particles) / N
+        for p in self.particles:
+            p.vel -= v_cm
+
         self.time = 0.0
-        
 
     def update(self, dt):
-        for particle in self.particles:
-            particle.update(dt)
+        # 1. Старые ускорения
+        acc_old = [p.calc_acceleration() for p in self.particles]
+
+        # 2. Обновляем координаты
+        for i, p in enumerate(self.particles):
+            p.cord += p.vel * dt + 0.5 * acc_old[i] * dt**2
+            p.cord = p.cord % self.L
+
+        # 3. Новые ускорения
+        acc_new = [p.calc_acceleration() for p in self.particles]
+
+        # 4. Обновляем скорости
+        for i, p in enumerate(self.particles):
+            p.vel += 0.5 * (acc_old[i] + acc_new[i]) * dt
+
         self.time += dt
-    
+
     def calc_Ek(self):
         return sum(p.calc_Ek() for p in self.particles)
-    
+
     def calc_Ep(self):
         return sum(p.calc_Ep() for p in self.particles) / 2
-    
+
     def calc_E(self):
         return self.calc_Ek() + self.calc_Ep()
 
-# Пусть наш газ - Аргон
-EPSILON = 1.66e-21 # Дж
-SIGMA = 3.41e-10 # м
-MASS = 6.63e-26 # кг
-
-import plotly.graph_objects as go
-
+# === Главная функция ===
 def main():
-    sys = ParticleSystem(100, EPSILON, SIGMA, MASS, 1e-8)
-    dt = 1e-15
-    ek_values = []
-    ep_values = []
-    e_values = []
+    N = 100
+    L = 10.0         # Размер ящика (в единицах σ)
+    dt = 0.005       # Безразмерный шаг
+    n_steps = 200    # Кол-во шагов
 
-    for i in range(100):
-        print(f"{i}\r", end='')
-        sys.update(dt)
-        k = sys.calc_Ek()
-        p = sys.calc_Ep()
-        ek_values.append(k)
-        ep_values.append(p)
-        e_values.append(k+p)
+    system = ParticleSystem(N, L)
 
+    ek_list, ep_list, e_list = [], [], []
+
+    for step in range(n_steps):
+        system.update(dt)
+        ek = system.calc_Ek()
+        ep = system.calc_Ep()
+        ek_list.append(ek)
+        ep_list.append(ep)
+        e_list.append(ek + ep)
+        print(f"Шаг {step:3d} | Ek = {ek:.4f}, Ep = {ep:.4f}, E = {ek+ep:.4f}")
+
+    # --- Построение графика ---
     fig = go.Figure()
-    fig.add_trace(go.Scatter(y=ek_values, mode='lines', name='Кинетическая'))
-    fig.add_trace(go.Scatter(y=ep_values, mode='lines', name='Потенциальная'))
-    fig.add_trace(go.Scatter(y=e_values, mode='lines', name='Полная'))
-    
-    fig.update_layout(title='Энергия системы',
+    fig.add_trace(go.Scatter(y=ek_list, mode='lines', name='Кинетическая энергия'))
+    fig.add_trace(go.Scatter(y=ep_list, mode='lines', name='Потенциальная энергия'))
+    fig.add_trace(go.Scatter(y=e_list, mode='lines', name='Полная энергия'))
+
+    fig.update_layout(title='Энергия системы (безразмерные единицы)',
                       xaxis_title='Шаг по времени',
-                      yaxis_title='Энергия (E)',
+                      yaxis_title='Энергия (в ε)',
                       legend=dict(x=0, y=1))
-    
     fig.show()
-    
+
 if __name__ == '__main__':
     main()
