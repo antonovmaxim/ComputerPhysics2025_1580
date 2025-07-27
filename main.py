@@ -119,12 +119,34 @@ EPSILON = 1.66e-21 # Дж
 SIGMA = 3.41e-10 # м
 MASS = 6.63e-26 # кг
 
+import plotly.graph_objects as go
+
 def main():
-    sys = ParticleSystem(100, EPSILON, SIGMA, MASS, 1e-6)
+    sys = ParticleSystem(100, EPSILON, SIGMA, MASS, 1e-8)
     dt = 1e-14
-    for i in range(100):
+    ek_values = []
+    ep_values = []
+    e_values = []
+
+    for i in range(40):
         sys.update(dt)
-        print(f'Ek: {sys.calc_Ek()}, Ep: {sys.calc_Ep()}, E: {sys.calc_E()}')
+        k = sys.calc_Ek()
+        p = sys.calc_Ep()
+        ek_values.append(k)
+        ep_values.append(p)
+        e_values.append(k+p)
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(y=ek_values, mode='lines', name='Кинетическая'))
+    fig.add_trace(go.Scatter(y=ep_values, mode='lines', name='Потенциальная'))
+    fig.add_trace(go.Scatter(y=e_values, mode='lines', name='Полная'))
+    
+    fig.update_layout(title='Энергия системы',
+                      xaxis_title='Шаг по времени',
+                      yaxis_title='Энергия (E)',
+                      legend=dict(x=0, y=1))
+    
+    fig.show()
     
 if __name__ == '__main__':
     main()
