@@ -1,5 +1,6 @@
 import numpy as np
 import plotly.graph_objects as go
+from tqdm import tqdm
 
 # === Безразмерные параметры ===
 EPSILON = 1.0
@@ -131,14 +132,14 @@ def main():
 
     ek_list, ep_list, e_list = [], [], []
 
-    for step in range(n_steps):
+    for step in tqdm(range(n_steps), desc="Симуляция"):
         system.update(dt)
         ek = system.calc_Ek()
         ep = system.calc_Ep()
         ek_list.append(ek)
         ep_list.append(ep)
         e_list.append(ek + ep)
-        print(f"Шаг {step:3d} | Ek = {ek:.4f}, Ep = {ep:.4f}, E = {ek+ep:.4f}\r", end="")
+        # print(f"Шаг {step:3d} | Ek = {ek:.4f}, Ep = {ep:.4f}, E = {ek+ep:.4f}\r", end="")
 
     # --- Построение графика ---
     fig = go.Figure()

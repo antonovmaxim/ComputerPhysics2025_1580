@@ -1,6 +1,7 @@
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from tqdm import tqdm
 
 # === Безразмерные параметры ===
 EPSILON = 1.0
@@ -157,13 +158,11 @@ def simulate_with_gr_return_gr(N, L, T0=0.45, dt=0.005, n_therm_steps=50, n_step
     system = ParticleSystem(N, L)
     stats = ExtendedStatsCollector()
 
-    for _ in range(n_therm_steps):
-        print(f"THERM: step {_}/{n_therm_steps}    \r", end="")
+    for _ in tqdm(range(n_therm_steps), desc = "Термализация"):
         system.update(dt)
         system.rescale_velocities(T0)
 
-    for _ in range(n_steps):
-        print(f"STEP: step {_}/{n_steps}     \r", end="")
+    for _ in tqdm(range(n_steps), desc = "Шаги"):
         system.update(dt)
         stats.record(system)
 
