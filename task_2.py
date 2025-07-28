@@ -114,7 +114,7 @@ def compute_gr(particles, L, dr=0.1, r_max=None, bins=None):
             r = np.linalg.norm(rij)
             if r < r_max:
                 bin_idx = int(r / dr)
-                counts[bin_idx] += 2
+                counts[bin_idx-1] += 2
 
     r_vals = dr * (np.arange(bins) + 0.5)
     shell_areas = 2 * np.pi * r_vals * dr
@@ -155,7 +155,7 @@ class ExtendedStatsCollector:
         }
 
 # === Симуляция с возвратом g(r) ===
-def simulate_with_gr_return_gr(N, L, T0=0.45, dt=0.005, n_therm_steps=50, n_steps=200, dr=0.1):
+def simulate_with_gr_return_gr(N, L, T0=0.45, dt=0.005, n_therm_steps=20, n_steps=20, dr=0.1):
     system = ParticleSystem(N, L)
     stats = ExtendedStatsCollector()
 
@@ -205,7 +205,7 @@ def main():
 
 def task2_energy_vs_temperature():
 
-    N = 100
+    N = 50
     rho = 0.4
     V = N / rho
     L = np.sqrt(V)
@@ -232,7 +232,7 @@ def task2_energy_vs_temperature():
     )
     fig.show()
 
-raise NotImplementedError("Не работает!!!")
+# raise NotImplementedError("Не работает!!!")
 
 if __name__ == "__main__":
     task2_energy_vs_temperature()
