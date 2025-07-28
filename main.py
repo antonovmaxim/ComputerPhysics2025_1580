@@ -1,6 +1,7 @@
 import numpy as np
 import plotly.graph_objects as go
 from tqdm import tqdm
+np.random.seed(42)
 
 # === Безразмерные параметры ===
 EPSILON = 1.0

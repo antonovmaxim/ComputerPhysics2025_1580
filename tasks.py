@@ -2,6 +2,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from tqdm import tqdm
+np.random.seed(42)
 
 # === Безразмерные параметры ===
 EPSILON = 1.0
