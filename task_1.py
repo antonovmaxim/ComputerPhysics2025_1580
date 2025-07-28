@@ -174,8 +174,8 @@ def simulate_with_gr_return_gr(N, L, T0=0.45, dt=0.005, n_therm_steps=50, n_step
 def main():
     cases = [
         ("Твёрдое тело", 0.1),
-        ("Жидкость", 2),
-        ("Газ", 20)
+        ("Жидкость", 8),
+        ("Газ", 25)
     ]
 
     N = 100
