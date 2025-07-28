@@ -173,9 +173,9 @@ def simulate_with_gr_return_gr(N, L, T0=0.45, dt=0.005, n_therm_steps=50, n_step
 # === Главная функция ===
 def main():
     cases = [
-        ("Твёрдое тело", 0.1),
-        ("Жидкость", 8),
-        ("Газ", 25)
+        ("Твёрдое тело", 0.1, 'white'),
+        ("Жидкость", 8, 'blue'),
+        ("Газ", 25, 'red')
     ]
 
     N = 100
@@ -183,12 +183,12 @@ def main():
 
     fig = go.Figure()
 
-    for name, T0 in cases:
+    for name, T0, c in cases:
         print(f"--- Диагностика фазы: {name} (T0 = {T0}) ---")
         summary, r_vals, g_vals = simulate_with_gr_return_gr(N=N, L=L, T0=T0)
         for key, val in summary.items():
             print(f"{key}: {val:.4f}         ")
-        fig.add_trace(go.Scatter(x=r_vals, y=g_vals, mode='lines', name=name))
+        fig.add_trace(go.Scatter(x=r_vals, y=g_vals, mode='lines', name=name, line=dict(color=c)))
 
     fig.update_layout(
         title_text="Радиальная функция распределения g(r) для разных фаз",
