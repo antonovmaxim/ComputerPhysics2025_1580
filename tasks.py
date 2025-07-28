@@ -173,29 +173,30 @@ def simulate_with_gr_return_gr(N, L, T0=0.45, dt=0.005, n_therm_steps=50, n_step
 # === Главная функция ===
 def main():
     cases = [
-        ("Твёрдое тело", 0.2),
-        ("Жидкость", 0.5),
-        ("Газ", 1.0)
+        ("Твёрдое тело", 0.1),
+        ("Жидкость", 2),
+        ("Газ", 20)
     ]
 
     N = 100
     L = 10.0
 
-    fig = make_subplots(rows=1, cols=3, subplot_titles=[name for name, _ in cases])
+    fig = go.Figure()
 
-    for i, (name, T0) in enumerate(cases):
-        print(f"\n--- Диагностика фазы: {name} (T0 = {T0}) ---")
+    for name, T0 in cases:
+        print(f"--- Диагностика фазы: {name} (T0 = {T0}) ---")
         summary, r_vals, g_vals = simulate_with_gr_return_gr(N=N, L=L, T0=T0)
         for key, val in summary.items():
             print(f"{key}: {val:.4f}         ")
-        fig.add_trace(go.Scatter(x=r_vals, y=g_vals, mode='lines', name=name),
-                      row=1, col=i + 1)
+        fig.add_trace(go.Scatter(x=r_vals, y=g_vals, mode='lines', name=name))
 
-    fig.update_layout(title_text="Радиальная функция распределения g(r) для разных фаз",
-                      showlegend=False,
-                      template="plotly_dark")
-    fig.update_xaxes(title_text="r", row=1, col=1)
-    fig.update_yaxes(title_text="g(r)", row=1, col=1)
+    fig.update_layout(
+        title_text="Радиальная функция распределения g(r) для разных фаз",
+        xaxis_title="r",
+        yaxis_title="g(r)",
+        template="plotly_dark",
+        legend_title="Фаза"
+    )
     fig.show()
 
 if __name__ == '__main__':
