@@ -1,174 +1,198 @@
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from tqdm import tqdm
+np.random.seed(42)
 
-# === Параметры системы ===
-N = 100
-rcut = 2.5
-dt = 0.005
-n_steps_eq = 100
-n_steps_avg = 50
+# === Безразмерные параметры ===
+EPSILON = 1.0
+SIGMA = 1.0
+MASS = 1.0
+K_B = 1.0
 
-# === Физические параметры для СИ ===
-sigma = 3.405e-10  # м
-epsilon = 1.65e-21  # Дж
-kB = 1.38e-23  # Дж/К
-m = 6.63e-26  # кг
+# === Частица ===
+class Particle:
+    def __init__(self, pclsys, cord):
+        self.pclsys = pclsys
+        self.cord = cord.copy()
+        self.vel = np.random.randn(2)
 
-def initialize_positions(L):
-    n = int(np.ceil(np.sqrt(N)))
-    x = np.linspace(0, L, n, endpoint=False)
-    y = np.linspace(0, L, n, endpoint=False)
-    xv, yv = np.meshgrid(x, y)
-    pos = np.vstack([xv.ravel(), yv.ravel()]).T[:N]
-    return pos
+    def calc_force(self):
+        F = np.zeros(2)
+        for p in self.pclsys.particles:
+            if p is self: continue
+            r = self.cord - p.cord
+            r -= self.pclsys.L * np.round(r / self.pclsys.L)
+            r_abs = np.linalg.norm(r)
+            if r_abs == 0: continue
+            f_scalar = (24 * EPSILON / r_abs**2) * ((2 * (SIGMA / r_abs)**12) - (SIGMA / r_abs)**6)
+            F += f_scalar * r
+        return F
 
-def initialize_velocities(T):
-    v = np.random.randn(N, 2)
-    v -= np.mean(v, axis=0)
-    v *= np.sqrt(T / np.mean(np.sum(v**2, axis=1)))
-    return v
+    def calc_Ek(self):
+        return 0.5 * MASS * np.dot(self.vel, self.vel)
 
-def compute_forces(pos, L):
-    forces = np.zeros_like(pos)
-    potential_energy = 0.0
-    virial = 0.0
-    for i in range(N):
-        for j in range(i + 1, N):
-            rij = pos[i] - pos[j]
-            rij -= L * np.round(rij / L)
-            r2 = np.dot(rij, rij)
-            if r2 < rcut**2:
-                inv_r2 = 1 / r2
-                inv_r6 = inv_r2 ** 3
-                inv_r12 = inv_r6 ** 2
-                f_scalar = 48 * inv_r2 * (inv_r12 - 0.5 * inv_r6)
-                fij = f_scalar * rij
-                forces[i] += fij
-                forces[j] -= fij
-                potential_energy += 4 * (inv_r12 - inv_r6)
-                virial += np.dot(rij, fij)
-    return forces, potential_energy, virial
+    def calc_Ep(self):
+        ep = 0.0
+        for p in self.pclsys.particles:
+            if p is self: continue
+            r = self.cord - p.cord
+            r -= self.pclsys.L * np.round(r / self.pclsys.L)
+            r_abs = np.linalg.norm(r)
+            if r_abs == 0: continue
+            ep += 4 * EPSILON * ((SIGMA / r_abs)**12 - (SIGMA / r_abs)**6)
+        return ep
 
-def velocity_verlet(pos, vel, dt, L):
-    forces, _, _ = compute_forces(pos, L)
-    pos += vel * dt + 0.5 * forces * dt**2
-    pos %= L
-    f_new, potential_energy, virial = compute_forces(pos, L)
-    vel += 0.5 * (forces + f_new) * dt
-    return pos, vel, f_new, potential_energy, virial
+# === Система частиц ===
+class ParticleSystem:
+    def __init__(self, N, L):
+        self.N = N
+        self.L = L
+        self.particles = []
 
-def kinetic_energy(vel):
-    return 0.5 * np.sum(vel**2)
+        n_side = int(np.sqrt(N))
+        a = L / n_side
+        for i in range(n_side):
+            for j in range(n_side):
+                if len(self.particles) >= N: break
+                pos = np.array([(i + 0.5) * a, (j + 0.5) * a])
+                self.particles.append(Particle(self, pos))
 
-def run_simulation(T, rho):
-    L = np.sqrt(N / rho)
-    pos = initialize_positions(L)
-    vel = initialize_velocities(T)
+        v_cm = sum(p.vel for p in self.particles) / N
+        for p in self.particles:
+            p.vel -= v_cm
 
-    for step in tqdm(range(n_steps_eq)):
-        pos, vel, forces, _, _ = velocity_verlet(pos, vel, dt, L)
+    def update(self, dt):
+        acc_old = [p.calc_force() / MASS for p in self.particles]
+        for i, p in enumerate(self.particles):
+            p.cord += p.vel * dt + 0.5 * acc_old[i] * dt**2
+            p.cord %= self.L
+        acc_new = [p.calc_force() / MASS for p in self.particles]
+        for i, p in enumerate(self.particles):
+            p.vel += 0.5 * (acc_old[i] + acc_new[i]) * dt
 
-    E_total, P_total = 0.0, 0.0
-    for step in tqdm(range(n_steps_avg)):
-        pos, vel, forces, potential, virial = velocity_verlet(pos, vel, dt, L)
-        kin = kinetic_energy(vel)
-        E_total += kin + potential
+    def calc_Ek(self):
+        return sum(p.calc_Ek() for p in self.particles)
 
-        V = L**2
-        P = rho * T + virial / (2 * V)
-        P_total += P
+    def calc_Ep(self):
+        return sum(p.calc_Ep() for p in self.particles) / 2
 
-    E_avg = E_total / n_steps_avg / N
-    P_avg = P_total / n_steps_avg
-    return E_avg, P_avg
+    def temperature(self):
+        return 2 * self.calc_Ek() / self.N
 
-# === Задание 2: E(T) и Cv ===
-rho_fixed = 0.4
-T_list = np.linspace(0.1, 2.0, 20)
-E_list = []
+    def rescale_velocities(self, target_T):
+        current_T = self.temperature()
+        scale = np.sqrt(target_T / current_T)
+        for p in self.particles:
+            p.vel *= scale
 
-for T in T_list:
-    print(f"[E(T)] Simulating T = {T:.2f}")
-    E_avg, _ = run_simulation(T, rho_fixed)
-    E_list.append(E_avg)
+    def calc_pressure(self):
+        virial_sum = 0.0
+        for p in self.particles:
+            F = p.calc_force()
+            virial_sum += np.dot(p.cord, F)
+        V = self.L ** 2
+        return (self.N * K_B * self.temperature() + 0.5 * virial_sum) / V
+    
 
-E_list = np.array(E_list)
-dT = T_list[1] - T_list[0]
-Cv_list = np.gradient(E_list, dT)
+# === Сбор статистики ===
+class ExtendedStatsCollector:
+    def __init__(self):
+        self.ek_list = []
+        self.ep_list = []
+        self.temp_list = []
+        self.pressure_list = []
+        self.coord_snapshots = []
 
-# === Перевод в СИ ===
-E_SI = E_list * epsilon
-Cv_SI = Cv_list * epsilon / kB
-Cv_SI_mol = Cv_SI * 6.022e23
+    def record(self, system):
+        Ek = system.calc_Ek()
+        Ep = system.calc_Ep()
+        T = 2 * Ek / system.N
+        P = system.calc_pressure()
 
-# === График E(T) и Cv ===
-plt.figure(figsize=(12, 5))
-plt.subplot(1, 2, 1)
-plt.plot(T_list, E_list, 'o-')
-plt.xlabel('T (LJ)')
-plt.ylabel('E/N (LJ)')
-plt.title('E(T), ρ = 0.4')
+        self.ek_list.append(Ek)
+        self.ep_list.append(Ep)
+        self.temp_list.append(T)
+        self.pressure_list.append(P)
+        self.coord_snapshots.append([p.cord.copy() for p in system.particles])
 
-plt.subplot(1, 2, 2)
-plt.plot(T_list, Cv_SI_mol, 's-r')
-plt.xlabel('T (LJ)')
-plt.ylabel('Cv (Дж/моль·К)')
-plt.title('Cv(T), ρ = 0.4')
+    def summarize(self):
+        N = len(self.ek_list)
+        return {
+            "mean_E": np.mean(np.array(self.ek_list) + np.array(self.ep_list)),
+            "std_E": np.std(np.array(self.ek_list) + np.array(self.ep_list)) / np.sqrt(N),
+            "mean_T": np.mean(self.temp_list),
+            "std_T": np.std(self.temp_list) / np.sqrt(N),
+            "mean_P": np.mean(self.pressure_list),
+            "std_P": np.std(self.pressure_list) / np.sqrt(N),
+        }
 
-plt.tight_layout()
-plt.show()
+def calc_pressure_kinetic(self):
+    V = self.L ** 2
+    total = 0.0
+    for p in self.particles:
+        a = p.calc_force() / MASS
+        total += np.dot(p.vel, a)
+    return MASS * total / V
+def task3_pressure_vs_density():
+    T0 = 0.45
+    N = 100
+    rhos = np.linspace(0.1, 1.0, 10)
+    
+    E_list = []
+    P_virial_list = []
+    P_kinetic_list = []
 
-# === Приблизительные температуры фазовых переходов ===
-d2E = np.gradient(Cv_list, dT)
-transitions = np.where(np.abs(d2E) > 5)[0]
+    print("--- ЗАДАЧА 3: E(ρ), P(ρ) при T = 0.45 ---")
 
-print("\n=== Температуры фазовых переходов (приблизительно) ===")
-for i in transitions:
-    print(f"T ≈ {T_list[i]:.2f}")
+    for rho in (rhos):
+        V = N / rho
+        L = np.sqrt(V)
+        system = ParticleSystem(N, L)
 
-# === Задание 3: Изотермы P(ρ) ===
-T_iso = [0.3, 0.6, 1.0, 1.5]
-rho_list = np.linspace(0.2, 0.8, 10)
-pressures = {}
+        # Термализация
+        for _ in tqdm(range(5)):
+            system.update(dt=0.005)
+            system.rescale_velocities(T0)
 
-for T in T_iso:
-    p_row = []
-    for rho in rho_list:
-        print(f"[P(ρ)] T = {T:.2f}, ρ = {rho:.3f}")
-        _, P_avg = run_simulation(T, rho)
-        p_row.append(P_avg)
-    pressures[T] = p_row
+        # Сбор статистики
+        stats = ExtendedStatsCollector()
+        for _ in tqdm(range(20)):
+            system.update(dt=0.005)
+            stats.record(system)
 
-# === График P(ρ) ===
-plt.figure(figsize=(8, 6))
-for T in T_iso:
-    plt.plot(rho_list, pressures[T], '-o', label=f"T = {T:.2f}")
-plt.xlabel("ρ (σ⁻²)")
-plt.ylabel("P (в LJ)")
-plt.title("Изотермы давления P(ρ)")
-plt.legend()
-plt.grid()
-plt.show()
-import matplotlib.animation as animation
+        summary = stats.summarize()
+        E_mean = summary["mean_E"] / N
+        P_virial = summary["mean_P"]
+        P_kinetic = np.mean([MASS * np.dot(p.vel, p.calc_force() / MASS) for p in system.particles]) / (L**2)
 
-def animate_simulation(T, rho, n_steps=500, interval=20):
-    L = np.sqrt(N / rho)
-    pos = initialize_positions(L)
-    vel = initialize_velocities(T)
+        E_list.append(E_mean)
+        P_virial_list.append(P_virial)
+        P_kinetic_list.append(P_kinetic)
 
-    fig, ax = plt.subplots(figsize=(5, 5))
-    scat = ax.scatter(pos[:, 0], pos[:, 1], s=20, c='blue')
-    ax.set_xlim(0, L)
-    ax.set_ylim(0, L)
-    ax.set_title(f"Движение частиц при T={T}, ρ={rho}")
-    ax.set_aspect('equal')
+        print(f"ρ = {rho:.2f} | E/N = {E_mean:.4f} | P_virial = {P_virial:.4f} | P_kinetic = {P_kinetic:.4f}")
 
-    def update(frame):
-        nonlocal pos, vel
-        pos, vel, _, _, _ = velocity_verlet(pos, vel, dt, L)
-        scat.set_offsets(pos)
-        return scat,
+    # --- Графики ---
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("Энергия E/N(ρ)", "Давление P(ρ)"))
 
-    ani = animation.FuncAnimation(fig, update, frames=n_steps, interval=interval, blit=True)
-    plt.show()
+    fig.add_trace(go.Scatter(x=rhos, y=E_list, mode='lines+markers', name='E/N', line=dict(color="white")), row=1, col=1)
+
+    fig.add_trace(go.Scatter(x=rhos, y=P_virial_list, mode='lines+markers', name='P (вириал)', line=dict(color="blue")), row=1, col=2)
+    fig.add_trace(go.Scatter(x=rhos, y=P_kinetic_list, mode='lines+markers', name='P (импульс)', line=dict(color="red")), row=1, col=2)
+
+    fig.update_layout(
+        title="Зависимость энергии и давления от плотности при T = 0.45",
+        template="plotly_dark",
+        legend_title="Метод"
+    )
+
+    fig.update_xaxes(title_text="Плотность ρ", row=1, col=1)
+    fig.update_yaxes(title_text="E/N", row=1, col=1)
+
+    fig.update_xaxes(title_text="Плотность ρ", row=1, col=2)
+    fig.update_yaxes(title_text="P", row=1, col=2)
+
+    fig.show()
+
+
+task3_pressure_vs_density()
