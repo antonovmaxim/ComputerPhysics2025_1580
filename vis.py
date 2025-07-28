@@ -7,7 +7,7 @@ np.random.seed(42)
 EPSILON = 1.0
 SIGMA = 1.0
 MASS = 1.0
-T0 = 1 #?
+T0 = 20 #?
 # Постоянная Больцмана
 K_b = 1
 
